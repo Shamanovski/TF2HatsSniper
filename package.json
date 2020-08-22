@@ -1,0 +1,20 @@
+{
+  "type": "module",
+  "name": "tf2-rare-seeker",
+  "version": "0.0.0",
+  "description": "TF2RareSeeker",
+  "main": "app.js",
+  "author": {
+    "name": ""
+  },
+  "dependencies": {
+    "colors": "^1.4.0",
+    "node-html-parser": "^1.2.20",
+    "request": "^2.88.2",
+    "steam-totp": "^2.1.1",
+    "steam-user": "^4.17.0",
+    "steamcommunity": "^3.41.6",
+    "sync-request": "^6.1.0",
+    "then-request": "^6.0.2"
+  }
+}
