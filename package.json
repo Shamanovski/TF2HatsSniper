@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "colors": "^1.4.0",
-    "node-html-parser": "^1.2.20",
+    "node-html-parser": "^1.2.21",
     "request": "^2.88.2",
     "steam-totp": "^2.1.1",
     "steam-user": "^4.17.0",
