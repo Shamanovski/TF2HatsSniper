@@ -1,7 +1,5 @@
 'use strict';
 import fs from "fs";
-import { getAuthCode } from "steam-totp";
-import SteamCommunity from "steamcommunity";
 import requestPromise from "request-promise-native"
 import { URL } from "url";
 
@@ -15,10 +13,11 @@ catch (e) {
     oldCache = {}
 }
 
-const writeStream = fs.createWriteStream("cache.json", "utf-8", {flags: "w"});
-const accounts = fs.readFileSync("accounts.txt", "utf-8").split("\n")
-const community = new SteamCommunity();
+const proxiesFromFile  = fs.readFileSync("proxies.txt", "utf-8").split("\n")
+
 let cache = {},
+    proxies = [].concat(proxiesFromFile),
+    proxy,
     response,
     assetid,
     effect,
@@ -27,102 +26,74 @@ let cache = {},
     price,
     effectAndColor;
 
-function getAccount() {
-    let account = accounts.pop()
-    if (account == undefined) {
-        console.log("Все аккаунты временно заблокированы. Подождите кое-какое время и запустите процесс снова")
-        return null
+async function getProxy() {
+    proxy = proxies.pop();
+    if (proxy == undefined) {
+        console.log("Все прокси в лимите. Жду 5 минут для разблокировки...");
+        await new Promise((res) => setTimeout(res, 300 * 1000));
+        proxies.concat(proxiesFromFile);
+        return await getProxy();
     }
-    account = account.split(":")
-    const login = account[0],
-        password = account[1],
-        sharedSecret = account[2];
-    const userOptions = {
-        "accountName": login,
-        "password": password,
-        "twoFactorCode": getAuthCode(sharedSecret),
-        "isLimited": false
-    }
-    return userOptions
+    console.log("Использую прокси %s", proxy)
+    return proxy
 }
 
 async function mainProcess() {
-    let account = getAccount();
-    await new Promise((resolve, reject) => community.login({accountName: account.accountName, password: account.password, twoFactorCode: account.twoFactorCode}, 
-        (err, sessionID, cookies, steamGuard) => {
-
-            console.log(`Использую аккаунт ${account.accountName}`)
-            account.cookies = cookies;
-            account.sessionID = sessionID;
-            account.isLimited = false;
-            resolve()
-        })
-    );
     try {
-
+        proxy = null;  // use local ip
         for (var i = 0; i < skins.length; i++) {
-            if (account.isLimited == true) {
-                account = getAccount();
-                await new Promise((resolve, reject) => community.login({accountName: account.accountName, password: account.password, twoFactorCode: account.twoFactorCode}, 
-                    (err, sessionID, cookies, steamGuard) => {
-                        console.log(`Использую аккаунт ${account.accountName}`)
-                        account.cookies = cookies;
-                        account.sessionID = sessionID;
-                        account.isLimited = false;
-                        resolve()
-                    })
-                );
-            }   
-            let skin = "Unusual%20" + skins[i].replace(" ", "%20");
+            let skin = skins[i];
+            let skinForURI = "Unusual%20" + skins[i].replace(" ", "%20");
             try {
-                link = `https://steamcommunity.com/market/listings/440/${skin}/render?start=0&count=100&currency=1&format=json`;
-                 response = await requestPromise({
-                     url: link,
-                     headers: {
-                        "sessionid": account.sessionID,
-                        "Cookie": account.cookies.join("; ")
+                link = `https://steamcommunity.com/market/listings/440/${skinForURI}/render?start=0&count=100&currency=1&format=json`;
+                response = await requestPromise({
+                    url: link,
+                    headers: {
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15"
                     },
                     timeout: 5 * 1000,
+                    proxy: proxy,
                     transform: (body) => JSON.parse(body)
                 });
-                    
-                    listinginfo = response["listinginfo"];
-                    if (listinginfo.length == 0)
-                    {
-                        console.log(`Для ${skin.replace()} нет лотов`)
-                        continue;
-                    };
-                    let index;
-                    for (let listing in listinginfo) {
-                        if (oldCache.hasOwnProperty(assetid)) continue;
-                        assetid = listinginfo[listing]["asset"]["id"];
-                        let descriptions = response["assets"]["440"]["2"][assetid]["descriptions"]
-                        for (let k = 0 ; k < descriptions.length; k++) {
-                            if (descriptions[k]["value"].includes("Unusual")) {
-                                index = k
-                                break
-                            }
+                
+                listinginfo = response["listinginfo"];
+                if (listinginfo.length == 0)
+                {
+                    console.log(`Для ${skin} нет лотов`)
+                    continue;
+                };
+                let index;
+                for (let listing in listinginfo) {
+                    if (oldCache.hasOwnProperty(assetid)) continue;
+                    assetid = listinginfo[listing]["asset"]["id"];
+                    let descriptions = response["assets"]["440"]["2"][assetid]["descriptions"]
+                    for (let k = 0 ; k < descriptions.length; k++) {
+                        if (descriptions[k]["value"].includes("Unusual")) {
+                            index = k
+                            break
                         }
-                        effect = descriptions[index];
-                        effectAndColor = (effect["value"] + " " + effect["color"])
-                        link = `https://steamcommunity.com/market/listings/440/${skin}?filter=${effect["value"]}`;
-                        skin = skin.replace("%20", " ");
-                        price = listinginfo[listing]["price"] + listinginfo[listing]["fee"];
-                        console.log(`${skin}: ${price / 100}$ ${effectAndColor}\n${new URL(link).toString()}\n\n`);
-                        cache[assetid] = { "skin": skin, "price": listinginfo[listing]["price"] + listinginfo[listing]["fee"], "effect": effect };
                     }
+                    effect = descriptions[index];
+                    effectAndColor = (effect["value"] + " " + effect["color"])
+                    link = `https://steamcommunity.com/market/listings/440/${skinForURI}?filter=${effect["value"]}`;
+                    price = listinginfo[listing]["price"] + listinginfo[listing]["fee"];
+                    console.log(`${skin}: ${price / 100}$ ${effectAndColor}\n${new URL(link).toString()}\n\n`);
+                    cache[assetid] = { "skin": skin, "price": listinginfo[listing]["price"] + listinginfo[listing]["fee"], "effect": effect };
                 }
+
+                fs.createWriteStream("cache.json", "utf-8", {flags: "w"}).write(JSON.stringify(cache))
+                
+            }
                 catch  (ex) {
-                    console.log("Аккаунт залимичен. Жду...")
-                    await new Promise((res) => setTimeout(res, 120 * 1000))
-                    // account.isLimited = true;
+                    console.log("Прокси залимичен. Меняю прокси...")
+                    proxy = await getProxy()
                     i -= 1
                 }
         }
     }
 
     finally {
-        if (Object.keys(cache).length > 0) writeStream.write(JSON.stringify(cache), "utf-8");
+        fs.createWriteStream("cache.json", "utf-8", {flags: "w"}).write(JSON.stringify(cache))
     }
 }
 
