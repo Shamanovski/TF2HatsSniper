@@ -29,8 +29,8 @@ let cache = {},
 async function getProxy() {
     proxy = proxies.pop();
     if (proxy == undefined) {
-        console.log("Все прокси в лимите. Жду 5 минут для разблокировки...");
-        await new Promise((res) => setTimeout(res, 300 * 1000));
+        console.log("Все прокси в лимите. Жду 7 минут для разблокировки...");
+        await new Promise((res) => setTimeout(res, 720 * 1000));
         proxies.concat(proxiesFromFile);
         return await getProxy();
     }
@@ -40,7 +40,7 @@ async function getProxy() {
 
 async function mainProcess() {
     try {
-        proxy = null;  // use local ip
+        proxy = await getProxy();
         for (var i = 0; i < skins.length; i++) {
             let skin = skins[i];
             let skinForURI = "Unusual%20" + skins[i].replace(" ", "%20");
@@ -49,9 +49,9 @@ async function mainProcess() {
                 response = await requestPromise({
                     url: link,
                     headers: {
-                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15"
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15",
                     },
-                    timeout: 5 * 1000,
+                    timeout: 30 * 1000,
                     proxy: proxy,
                     transform: (body) => JSON.parse(body)
                 });
@@ -77,14 +77,15 @@ async function mainProcess() {
                     effectAndColor = (effect["value"] + " " + effect["color"])
                     link = `https://steamcommunity.com/market/listings/440/${skinForURI}?filter=${effect["value"]}`;
                     price = listinginfo[listing]["price"] + listinginfo[listing]["fee"];
-                    console.log(`${skin}: ${price / 100}$ ${effectAndColor}\n${new URL(link).toString()}\n\n`);
+                    console.log(`${effect["color"]}`)(`${skin}: ${price / 100}$ ${effectAndColor}\n${new URL(link).toString()}\n\n`);
                     cache[assetid] = { "skin": skin, "price": listinginfo[listing]["price"] + listinginfo[listing]["fee"], "effect": effect };
                 }
-
+                
+                await new Promise((res) => setTimeout(res, 5 * 1000));
                 fs.createWriteStream("cache.json", "utf-8", {flags: "w"}).write(JSON.stringify(cache))
                 
             }
-                catch  (ex) {
+            catch  (ex) {
                     console.log("Прокси залимичен. Меняю прокси...")
                     proxy = await getProxy()
                     i -= 1
@@ -93,7 +94,7 @@ async function mainProcess() {
     }
 
     finally {
-        fs.createWriteStream("cache.json", "utf-8", {flags: "w"}).write(JSON.stringify(cache))
+        fs.createWriteStream("cache.json", "utf-8", {flags: "w"}).write(JSON.stringify(cache)) 
     }
 }
 

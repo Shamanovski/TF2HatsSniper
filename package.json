@@ -8,16 +8,10 @@
     "name": ""
   },
   "dependencies": {
-    "cheerio": "^1.0.0-rc.3",
+    "chalk": "^4.1.0",
     "colors": "^1.4.0",
     "node-html-parser": "^1.2.21",
-    "parse5": "^6.0.1",
-    "request": "^2.88.2",
-    "start": "^5.1.0",
-    "steam-totp": "^2.1.1",
-    "steam-user": "^4.17.0",
-    "steamcommunity": "^3.41.6",
-    "sync-request": "^6.1.0",
-    "then-request": "^6.0.2"
+    "request-promise-native": "",
+    "start": "^5.1.0"
   }
 }
